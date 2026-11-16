@@ -33,6 +33,19 @@ function existsExact(rel) {
 }
 
 const html = read("index.html");
+const notFound = read("404.html");
+
+// The error page should still be branded, safe to load and able to lead the visitor home.
+check("404 page has language, CSP and recovery links",
+  /<html lang="en-GB"/.test(notFound) && /http-equiv="Content-Security-Policy"/i.test(notFound) && /href="\.\/"/.test(notFound) && /href="tel:/.test(notFound));
+const notFoundRefs = [...notFound.matchAll(/(?:src|href)="([^"]+)"/g)]
+  .map((m) => m[1])
+  .filter((u) => !/^(?:https?:|#|tel:|mailto:|data:)/i.test(u));
+const notFoundMissing = [...new Set(notFoundRefs.filter((u) => !existsSync(join(root, u))))];
+check("404 page assets exist", notFoundMissing.length === 0, notFoundMissing.join(", "));
+
+// Labelled sections should carry a real heading, not just styling.
+check("FAQ section has a heading", /aria-label="Common questions"\s*>\s*<h2\b/.test(html));
 
 // One h1, unique IDs.
 const h1 = (html.match(/<h1\b/gi) || []).length;
@@ -238,7 +251,9 @@ check("service options match structured data", sameSet(serviceOptions, catalogNa
 // Contact identity repeats in structured data, visible text, metadata and the manifest.
 const salon = blocks.map((b) => { try { return JSON.parse(b); } catch { return {}; } }).find((j) => j["@type"] === "HairSalon" && j.address);
 const address = salon?.address || {};
-const addressOk = !!address.streetAddress && !!address.postalCode && html.includes(address.streetAddress) && html.includes(address.postalCode);
+// Exclude JSON-LD itself, otherwise the structured copy trivially satisfies the check.
+const visibleHtml = html.replace(/<script\b[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/gi, "");
+const addressOk = !!address.streetAddress && !!address.postalCode && visibleHtml.includes(address.streetAddress) && visibleHtml.includes(address.postalCode);
 check("structured address matches page text", addressOk, `${address.streetAddress || "?"} / ${address.postalCode || "?"}`);
 const name = salon?.name || "";
 const nameOk = !!name && html.includes(`<title>${name}`) && html.includes(`property="og:title" content="${name}"`) && manifest?.name === name;
