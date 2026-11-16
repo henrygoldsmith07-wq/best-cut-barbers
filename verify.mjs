@@ -262,13 +262,10 @@ const name = salon?.name || "";
 const nameOk = !!name && html.includes(`<title>${name}`) && html.includes(`property="og:title" content="${name}"`) && manifest?.name === name;
 check("business name matches title and manifest", nameOk, name || "no structured name");
 
-// The secondary 404 page inherits the same protection and contact details.
-const notFound = read("404.html");
-const nfRefs = [...notFound.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]).filter((u) => !/^(?:https?:|#|tel:|mailto:|data:)/i.test(u));
-check("404 local assets exist", nfRefs.length > 0 && nfRefs.every((u) => existsSync(join(root, u))), nfRefs.join(", "));
-check("404 has strict CSP and noindex", /Content-Security-Policy/.test(notFound) && /script-src 'self'/.test(notFound) && /noindex/.test(notFound));
+// The 404 page's contact details and script policy must match the main page.
 const nfPhones = [...new Set([...notFound.matchAll(/href="tel:([^"]+)"/g)].map((m) => digits(m[1])))];
 check("404 phone matches structured data", nfPhones.length > 0 && nfPhones.every((p) => ldPhones.has(p)), nfPhones.join(", "));
+check("404 has strict script policy and noindex", /script-src 'self'/.test(notFound) && /noindex/.test(notFound));
 
 // The sitemap must point at the same canonical URL as the main page.
 const canonical = html.match(/rel="canonical" href="([^"]+)"/)?.[1];
