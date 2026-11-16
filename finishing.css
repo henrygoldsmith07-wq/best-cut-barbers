@@ -50,7 +50,7 @@ details p{line-height:1.8}.hint,.br-meta{font-size:14px;line-height:1.7}
  .photo-card figcaption{padding:8px 0}.drawer{max-width:100%;width:min(480px,100%)}
  .drawer-head{padding:20px}.drawer-body{padding:20px}.drawer-foot{padding:16px 20px max(16px,env(safe-area-inset-bottom))}
  .viewer-controls{gap:8px}.viewer-controls button{padding:12px}
- body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+ body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}body.error-page{padding-bottom:0}
 }
 @media(max-width:360px){.photo-grid{columns:1}.direction-actions a{width:100%}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}

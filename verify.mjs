@@ -48,7 +48,8 @@ const errorSheets = [...notFound.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map
 check("404 page uses the main stylesheet cascade", mainSheets.every((f) => errorSheets.includes(f)), errorSheets.join(", "));
 
 // Labelled sections should carry a real heading, not just styling.
-check("FAQ section has a heading", /aria-label="Common questions"\s*>\s*<h2\b/.test(html));
+const faq = html.match(/<section class="section" aria-label="([^"]+)">\s*<h2[^>]*>([^<]+)<\/h2>/);
+check("FAQ section has a matching heading", !!faq && faq[1] === faq[2], faq ? `${faq[1]} vs ${faq[2]}` : "missing");
 
 // One h1, unique IDs.
 const h1 = (html.match(/<h1\b/gi) || []).length;
@@ -145,6 +146,17 @@ const unstyled = classes.filter((c) => {
 });
 check("HTML classes are styled", unstyled.length === 0, unstyled.join(", "));
 
+// Mobile visual order must match DOM/tab order; theme colour must come from the cascade.
+const toggleAt = html.indexOf('class="nav-toggle"');
+check("menu button precedes nav in DOM", toggleAt !== -1 && toggleAt < html.indexOf('id="main-nav"'));
+const themeColor = html.match(/name="theme-color" content="#([0-9a-f]{6})"/i)?.[1];
+// The meta colour must come from the page's own design tokens, not a stale hex.
+const baseColors = new Set([...loadedCss.matchAll(/--base:\s*#([0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase()));
+check("theme colour comes from page tokens", !!themeColor && baseColors.has(themeColor.toLowerCase()), `${themeColor || "missing"} vs ${[...baseColors].join(", ")}`);
+const errorFields = ["name", "date", "preferred-time"];
+const undescribed = errorFields.filter((id) => !new RegExp(`id="${id}"[^>]*aria-describedby="visit-error"`).test(html));
+check("validated fields describe the error region", undescribed.length === 0, undescribed.join(", "));
+
 // Structured data parses.
 const blocks = [...html.matchAll(/<script\s+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
 check("structured data present", blocks.length > 0);
@@ -172,6 +184,13 @@ for (const j of salonNodes) {
 }
 check("structured data references resolve", danglingRefs.length === 0, danglingRefs.join(", "));
 
+// Documented metadata must stay present in the shipped page.
+check("main page language set", /<html lang="en-GB"/.test(html));
+check("manifest linked from main page", /<link[^>]+rel="manifest"[^>]+href="site\.webmanifest"/.test(html));
+check("Open Graph locale present", /property="og:locale" content="en_GB"/.test(html));
+const ldIds = ldNodes.map((j) => j["@id"]).filter(Boolean);
+check("structured data IDs unique", new Set(ldIds).size === ldIds.length, ldIds.join(", "));
+
 // Web app manifest parses and its local icons exist.
 let manifest = null;
 try { manifest = JSON.parse(read("site.webmanifest")); } catch { /* reported below */ }
@@ -188,7 +207,24 @@ const ldPhones = new Set(blocks.flatMap((b) => {
 }));
 const telLinks = [...new Set([...html.matchAll(/href="tel:([^"]+)"/g)].map((m) => m[1]))];
 const phoneMismatch = telLinks.filter((t) => ldPhones.size && !ldPhones.has(digits(t)));
-check("tel links match structured data", phoneMismatch.length === 0, phoneMismatch.join(", "));
+check("tel links match structured data", ldPhones.size > 0 && phoneMismatch.length === 0, phoneMismatch.join(", "));
+
+// The number is also printed as text and embedded in generated links, not only in tel: hrefs.
+const phonePattern = /(?:\+?44|0)7\d{3}[\s -]?\d{6}/g;
+const ukNumber = (value) => {
+  const d = digits(value);
+  return d.startsWith("44") ? d.slice(2) : d.startsWith("0") ? d.slice(1) : d;
+};
+const ukPhones = new Set([...ldPhones].map(ukNumber));
+const phoneSources = [["index.html", html], ["404.html", read("404.html")],
+  ...files.filter((f) => f.endsWith(".js")).map((f) => [f, read(f)])];
+const phoneDrift = [];
+for (const [name, text] of phoneSources) {
+  for (const m of text.matchAll(phonePattern)) {
+    if (!ukPhones.has(ukNumber(m[0]))) phoneDrift.push(`${name}: ${m[0]}`);
+  }
+}
+check("all displayed phone numbers match structured data", phoneDrift.length === 0, phoneDrift.slice(0, 3).join(", "));
 
 // Opening hours are repeated in structured data, the live status and form validation.
 const dayNumbers = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
@@ -258,6 +294,13 @@ const address = salon?.address || {};
 const visibleHtml = html.replace(/<script\b[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/gi, "");
 const addressOk = !!address.streetAddress && !!address.postalCode && visibleHtml.includes(address.streetAddress) && visibleHtml.includes(address.postalCode);
 check("structured address matches page text", addressOk, `${address.streetAddress || "?"} / ${address.postalCode || "?"}`);
+const mapsLinks = [...new Set([...html.matchAll(/https:\/\/maps\.google\.com\/[^"' ]+/g)].map((m) => m[0]))];
+const addressParts = [address.streetAddress, address.postalCode].filter(Boolean);
+const mapsDrift = mapsLinks.filter((url) => {
+  const decoded = decodeURIComponent(url.replace(/\+/g, " "));
+  return !addressParts.every((part) => decoded.includes(part));
+});
+check("maps links carry the structured address", mapsLinks.length > 0 && mapsDrift.length === 0, mapsDrift.slice(0, 2).join(", "));
 const name = salon?.name || "";
 const nameOk = !!name && html.includes(`<title>${name}`) && html.includes(`property="og:title" content="${name}"`) && manifest?.name === name;
 check("business name matches title and manifest", nameOk, name || "no structured name");

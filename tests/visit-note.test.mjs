@@ -123,3 +123,47 @@ test("native validation failure blocks the note", () => {
   assert.equal(app.el("#result").hidden, true);
   assert.equal(app.el("#visit-error").hidden, true);
 });
+
+test("a successful note focuses the heading, not the live region", () => {
+  const app = fill(loadApp());
+  submit(app);
+  const result = app.el("#result");
+  assert.equal(result.children[0].tagName, "H3");
+  assert.equal(result.children[0].focused, true);
+  assert.equal(result.focused, false);
+});
+
+test("copy confirmation is written to a polite live region", async () => {
+  const app = fill(loadApp());
+  submit(app);
+  const status = app.el("#result").children[4];
+  assert.equal(status.getAttribute("aria-live"), "polite");
+  app.el("#result").children[2].children[1].dispatch("click");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(status.textContent, "Note copied");
+});
+
+test("a preferred time that has already passed today is rejected", () => {
+  const now = londonNow();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (minutes < 541) return; // before 09:01 London, no in-hours time has passed yet
+  const past = minutes >= 540 && minutes < 1080 ? minutes - 1 : 600;
+  const time = String(Math.floor(past / 60)).padStart(2, "0") + ":" + String(past % 60).padStart(2, "0");
+  const app = fill(loadApp(), { date: iso(now), time });
+  submit(app);
+  assert.match(app.el("#visit-error").textContent, /That time has passed/);
+  assert.equal(app.el("#result").hidden, true);
+});
+
+test("Sunday uses the listed 10:00 to 16:00 window", () => {
+  const now = londonNow();
+  const sunday = new Date(now);
+  sunday.setDate(sunday.getDate() + ((7 - sunday.getDay()) % 7 || 7));
+  const date = iso(sunday);
+  const early = fill(loadApp(), { date, time: "09:00" });
+  submit(early);
+  assert.match(early.el("#visit-error").textContent, /within the listed opening hours/);
+  const valid = fill(loadApp(), { date, time: "10:30" });
+  submit(valid);
+  assert.equal(valid.el("#result").hidden, false);
+});
