@@ -138,6 +138,24 @@ blocks.forEach((b, i) => {
 });
 check("JSON-LD parses", badJson.length === 0, badJson.join("; "));
 
+// One addressed business entity, with any referenced nodes actually present.
+// A second HairSalon node for the offer catalogue is intentional.
+const ldNodes = blocks.flatMap((b) => {
+  try { const j = JSON.parse(b); return Array.isArray(j) ? j : [j]; } catch { return []; }
+});
+const salonNodes = ldNodes.filter((j) => j["@type"] === "HairSalon");
+const addressedSalons = salonNodes.filter((j) => j.address?.streetAddress);
+check("one addressed business entity in structured data", addressedSalons.length === 1, `found ${addressedSalons.length}`);
+const nodeIds = new Set(ldNodes.map((j) => j["@id"]).filter(Boolean));
+const danglingRefs = [];
+for (const j of salonNodes) {
+  for (const prop of ["contactPoint", "hasOfferCatalog"]) {
+    const ref = j[prop]?.["@id"];
+    if (ref && !nodeIds.has(ref)) danglingRefs.push(`${prop} -> ${ref}`);
+  }
+}
+check("structured data references resolve", danglingRefs.length === 0, danglingRefs.join(", "));
+
 // Web app manifest parses and its local icons exist.
 let manifest = null;
 try { manifest = JSON.parse(read("site.webmanifest")); } catch { /* reported below */ }
@@ -216,6 +234,15 @@ const catalogNames = new Set(blocks.flatMap((b) => {
   catch { return []; }
 }));
 check("service options match structured data", sameSet(serviceOptions, catalogNames), setDifference(serviceOptions, catalogNames) || setDifference(catalogNames, serviceOptions));
+
+// Contact identity repeats in structured data, visible text, metadata and the manifest.
+const salon = blocks.map((b) => { try { return JSON.parse(b); } catch { return {}; } }).find((j) => j["@type"] === "HairSalon" && j.address);
+const address = salon?.address || {};
+const addressOk = !!address.streetAddress && !!address.postalCode && html.includes(address.streetAddress) && html.includes(address.postalCode);
+check("structured address matches page text", addressOk, `${address.streetAddress || "?"} / ${address.postalCode || "?"}`);
+const name = salon?.name || "";
+const nameOk = !!name && html.includes(`<title>${name}`) && html.includes(`property="og:title" content="${name}"`) && manifest?.name === name;
+check("business name matches title and manifest", nameOk, name || "no structured name");
 
 // Strict script policy, and the meta CSP must appear before anything it governs.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
