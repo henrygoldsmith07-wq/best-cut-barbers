@@ -29,3 +29,6 @@ Run `node verify.mjs` from the repository root to repeat the static checks witho
 
 ## Accessibility and verifier hardening — 16 November 2026
 The skip link's target (`#main`) now has `tabindex="-1"`, so activating "Skip to content" reliably moves keyboard focus into the main landmark. The verifier gained four checks: in-page `href="#id"` links resolve to a real element, the skip-link target is focusable, `target="_blank"` links carry `rel="noopener"`, and no `http://` URLs are present. Each was confirmed to fail on a planted defect. Static checks now total 15; no business details, dependencies or publish settings changed.
+
+## Reliability hardening — 16 November 2026
+The opening-hours status no longer derives a weekday name from a hardcoded 15 November 2026 date; it uses an explicit Sunday-to-Saturday name list, so the displayed "next listed opening" is independent of the calendar date. The verifier gained three more checks: ARIA ID references (`aria-labelledby`, `aria-controls`, `aria-describedby`, `aria-owns`) resolve to real elements, every visible form control has a label or accessible name, and every `tel:` link digits match the telephone in JSON-LD. Each was confirmed to fail on a planted defect. Static checks now total 18. No new dependencies, publish settings or business facts.

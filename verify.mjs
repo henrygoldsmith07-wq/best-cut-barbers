@@ -41,6 +41,30 @@ const skipFocusable = skipTarget
   : false;
 check("skip link target is focusable", skipFocusable, skipTarget || "no skip link found");
 
+// ARIA ID references must point at real elements.
+const badAria = [];
+for (const attr of ["aria-labelledby", "aria-controls", "aria-describedby", "aria-owns"]) {
+  for (const m of html.matchAll(new RegExp(`${attr}="([^"]+)"`, "g"))) {
+    for (const id of m[1].split(/\s+/).filter(Boolean)) {
+      if (!ids.includes(id)) badAria.push(`${attr} -> ${id}`);
+    }
+  }
+}
+check("ARIA ID references resolve", badAria.length === 0, badAria.join(", "));
+
+// Every visible form control needs a label or an accessible name.
+const labelled = new Set([...html.matchAll(/<label\s+for="([^"]+)"/g)].map((m) => m[1]));
+const unlabelled = [];
+for (const m of html.matchAll(/<(input|select|textarea)\b([^>]*)>/gi)) {
+  const attrs = m[2];
+  if (/\btype="hidden"/i.test(attrs)) continue;
+  const id = attrs.match(/\sid="([^"]+)"/)?.[1];
+  if (!(id && labelled.has(id)) && !/\baria-label=|\baria-labelledby=/.test(attrs)) {
+    unlabelled.push(m[1] + (id ? `#${id}` : ""));
+  }
+}
+check("form controls are labelled", unlabelled.length === 0, unlabelled.join(", "));
+
 // Local src/href references resolve.
 const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
   .map((m) => m[1])
@@ -88,6 +112,16 @@ blocks.forEach((b, i) => {
   try { JSON.parse(b); } catch (e) { badJson.push(`block ${i + 1}: ${e.message}`); }
 });
 check("JSON-LD parses", badJson.length === 0, badJson.join("; "));
+
+// Click-to-call numbers must agree with the telephone in structured data.
+const digits = (s) => (s.match(/\d/g) || []).join("");
+const ldPhones = new Set(blocks.flatMap((b) => {
+  try { const j = JSON.parse(b); return j.telephone ? [digits(j.telephone)] : []; }
+  catch { return []; }
+}));
+const telLinks = [...new Set([...html.matchAll(/href="tel:([^"]+)"/g)].map((m) => m[1]))];
+const phoneMismatch = telLinks.filter((t) => ldPhones.size && !ldPhones.has(digits(t)));
+check("tel links match structured data", phoneMismatch.length === 0, phoneMismatch.join(", "));
 
 // Strict script policy.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
