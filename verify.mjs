@@ -150,9 +150,9 @@ check("HTML classes are styled", unstyled.length === 0, unstyled.join(", "));
 const toggleAt = html.indexOf('class="nav-toggle"');
 check("menu button precedes nav in DOM", toggleAt !== -1 && toggleAt < html.indexOf('id="main-nav"'));
 const themeColor = html.match(/name="theme-color" content="#([0-9a-f]{6})"/i)?.[1];
-// The meta colour must come from the page's own design tokens, not a stale hex.
-const baseColors = new Set([...loadedCss.matchAll(/--base:\s*#([0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase()));
-check("theme colour comes from page tokens", !!themeColor && baseColors.has(themeColor.toLowerCase()), `${themeColor || "missing"} vs ${[...baseColors].join(", ")}`);
+// Later stylesheets win, so the last --base is the colour the browser computes for the page.
+const computedBase = [...loadedCss.matchAll(/--base:\s*#([0-9a-f]{6})/gi)].at(-1)?.[1]?.toLowerCase();
+check("theme colour matches the computed page base", !!themeColor && themeColor.toLowerCase() === computedBase, `${themeColor || "missing"} vs ${computedBase || "missing"}`);
 const errorFields = ["name", "date", "preferred-time"];
 const undescribed = errorFields.filter((id) => !new RegExp(`id="${id}"[^>]*aria-describedby="visit-error"`).test(html));
 check("validated fields describe the error region", undescribed.length === 0, undescribed.join(", "));
