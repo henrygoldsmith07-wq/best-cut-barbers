@@ -43,6 +43,9 @@ const notFoundRefs = [...notFound.matchAll(/(?:src|href)="([^"]+)"/g)]
   .filter((u) => !/^(?:https?:|#|tel:|mailto:|data:)/i.test(u));
 const notFoundMissing = [...new Set(notFoundRefs.filter((u) => !existsSync(join(root, u))))];
 check("404 page assets exist", notFoundMissing.length === 0, notFoundMissing.join(", "));
+const mainSheets = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map((m) => m[1]);
+const errorSheets = [...notFound.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map((m) => m[1]);
+check("404 page uses the main stylesheet cascade", mainSheets.every((f) => errorSheets.includes(f)), errorSheets.join(", "));
 
 // Labelled sections should carry a real heading, not just styling.
 check("FAQ section has a heading", /aria-label="Common questions"\s*>\s*<h2\b/.test(html));
@@ -258,6 +261,19 @@ check("structured address matches page text", addressOk, `${address.streetAddres
 const name = salon?.name || "";
 const nameOk = !!name && html.includes(`<title>${name}`) && html.includes(`property="og:title" content="${name}"`) && manifest?.name === name;
 check("business name matches title and manifest", nameOk, name || "no structured name");
+
+// The secondary 404 page inherits the same protection and contact details.
+const notFound = read("404.html");
+const nfRefs = [...notFound.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]).filter((u) => !/^(?:https?:|#|tel:|mailto:|data:)/i.test(u));
+check("404 local assets exist", nfRefs.length > 0 && nfRefs.every((u) => existsSync(join(root, u))), nfRefs.join(", "));
+check("404 has strict CSP and noindex", /Content-Security-Policy/.test(notFound) && /script-src 'self'/.test(notFound) && /noindex/.test(notFound));
+const nfPhones = [...new Set([...notFound.matchAll(/href="tel:([^"]+)"/g)].map((m) => digits(m[1])))];
+check("404 phone matches structured data", nfPhones.length > 0 && nfPhones.every((p) => ldPhones.has(p)), nfPhones.join(", "));
+
+// The sitemap must point at the same canonical URL as the main page.
+const canonical = html.match(/rel="canonical" href="([^"]+)"/)?.[1];
+const sitemapLocs = [...read("sitemap.xml").matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+check("sitemap matches canonical URL", !!canonical && sitemapLocs.length > 0 && sitemapLocs.every((u) => u === canonical), sitemapLocs.join(", "));
 
 // Strict script policy, and the meta CSP must appear before anything it governs.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
