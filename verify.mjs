@@ -156,6 +156,67 @@ const telLinks = [...new Set([...html.matchAll(/href="tel:([^"]+)"/g)].map((m) =
 const phoneMismatch = telLinks.filter((t) => ldPhones.size && !ldPhones.has(digits(t)));
 check("tel links match structured data", phoneMismatch.length === 0, phoneMismatch.join(", "));
 
+// Opening hours are repeated in structured data, the live status and form validation.
+const dayNumbers = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+const toMinutes = (value) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(value || ""));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+let listedHours = null;
+for (const b of blocks) {
+  try {
+    const j = JSON.parse(b);
+    if (!Array.isArray(j.openingHoursSpecification)) continue;
+    const map = {};
+    for (const spec of j.openingHoursSpecification) {
+      const days = Array.isArray(spec.dayOfWeek) ? spec.dayOfWeek : [spec.dayOfWeek];
+      const range = [toMinutes(spec.opens), toMinutes(spec.closes)];
+      if (range.some((v) => v === null)) continue;
+      for (const day of days) if (dayNumbers[day] !== undefined) map[dayNumbers[day]] = range;
+    }
+    if (Object.keys(map).length) listedHours = map;
+  } catch { /* already reported by the JSON-LD check */ }
+}
+check("structured opening hours present", !!listedHours);
+const hoursMatch = (actual) => !!listedHours && Object.keys(listedHours).length === Object.keys(actual).length &&
+  Object.entries(listedHours).every(([day, range]) => actual[day] && range[0] === actual[day][0] && range[1] === actual[day][1]);
+
+const statusSource = read("experience.js").match(/hours=best\?\{([^}]*)\}/)?.[1];
+const statusHours = {};
+if (statusSource) {
+  for (const m of statusSource.matchAll(/(\d):\[(\d+),(\d+)\]/g)) statusHours[Number(m[1])] = [Number(m[2]), Number(m[3])];
+}
+check("status hours match structured data", hoursMatch(statusHours));
+
+const validation = read("app.js").match(/chosen\.getDay\(\)===0\?\[(\d+),(\d+)\]:\[(\d+),(\d+)\]/);
+const validationHours = {};
+if (validation) {
+  validationHours[0] = [Number(validation[1]), Number(validation[2])];
+  for (let day = 1; day <= 6; day++) validationHours[day] = [Number(validation[3]), Number(validation[4])];
+}
+check("form hours match structured data", hoursMatch(validationHours));
+
+const clockText = (value) => String(Math.floor(value / 60)).padStart(2, "0") + ":" + String(value % 60).padStart(2, "0");
+const listedRanges = [...new Set(Object.values(listedHours || {}).map(([open, close]) => `${clockText(open)}–${clockText(close)}`))];
+check("listed hours text matches structured data", !!listedHours && listedRanges.every((range) => html.includes(range)));
+
+// The two services are repeated in the hero, the service list, the form and structured data.
+const sameSet = (a, b) => a.size === b.size && [...a].every((item) => b.has(item));
+const setDifference = (a, b) => [...a].filter((item) => !b.has(item)).join(", ");
+const serviceMarkup = html.match(/<select\s+id="service"[^>]*>([\s\S]*?)<\/select>/i)?.[1] || "";
+const serviceOptions = new Set([...serviceMarkup.matchAll(/<option[^>]*>([^<]+)<\/option>/gi)].map((m) => m[1].trim()));
+const heroServices = new Set([...html.matchAll(/data-hero-service="([^"]+)"/g)].map((m) => m[1]));
+const linkServices = new Set([...html.matchAll(/data-service="([^"]+)"/g)].map((m) => m[1]));
+check("service options match hero buttons", sameSet(serviceOptions, heroServices), setDifference(serviceOptions, heroServices) || setDifference(heroServices, serviceOptions));
+check("service options match service links", sameSet(serviceOptions, linkServices), setDifference(serviceOptions, linkServices) || setDifference(linkServices, serviceOptions));
+const pressed = [...html.matchAll(/data-hero-service="([^"]+)"[^>]*aria-pressed="true"/g)].map((m) => m[1]);
+check("one hero service is pressed and offered", pressed.length === 1 && serviceOptions.has(pressed[0]), pressed.join(", "));
+const catalogNames = new Set(blocks.flatMap((b) => {
+  try { const j = JSON.parse(b); return (j.hasOfferCatalog?.itemListElement || []).map((item) => item.itemOffered?.name).filter(Boolean); }
+  catch { return []; }
+}));
+check("service options match structured data", sameSet(serviceOptions, catalogNames), setDifference(serviceOptions, catalogNames) || setDifference(catalogNames, serviceOptions));
+
 // Strict script policy, and the meta CSP must appear before anything it governs.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
 const cspAt = html.search(/<meta\s+http-equiv="Content-Security-Policy"/i);
