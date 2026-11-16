@@ -23,3 +23,6 @@ Scroll-reveal section entrances (IntersectionObserver, reduced-motion safe), poi
 
 ## Vibrancy pass — 15 November 2026
 Brand-specific vibrancy layer appended to site.css: richer gradients and section depth, gradient headline/section headings, gradient primary buttons and glowing hover/selection states. All zero-dependency; respects prefers-reduced-motion; strict CSP unchanged; one h1 retained; no unverified claims added.
+
+## Verification — 16 November 2026
+Run `node verify.mjs` from the repository root to repeat the static checks without installing anything or starting a server. It checks the single h1, unique IDs, local asset references, CSS asset references and brace balance, that used HTML classes are styled, that JSON-LD parses, the strict script policy, and JavaScript syntax. A zero exit status means all checks passed. This complements, but does not replace, the manual browser checks recorded in QA-2026-11-16.md.
