@@ -131,8 +131,21 @@ const telLinks = [...new Set([...html.matchAll(/href="tel:([^"]+)"/g)].map((m) =
 const phoneMismatch = telLinks.filter((t) => ldPhones.size && !ldPhones.has(digits(t)));
 check("tel links match structured data", phoneMismatch.length === 0, phoneMismatch.join(", "));
 
-// Strict script policy.
+// Strict script policy, and the meta CSP must appear before anything it governs.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
+const cspAt = html.search(/<meta\s+http-equiv="Content-Security-Policy"/i);
+const firstScriptAt = html.search(/<script\b/i);
+check("CSP meta precedes scripts", cspAt !== -1 && firstScriptAt !== -1 && cspAt < firstScriptAt);
+
+// No DOM XSS or code-execution sinks in the shipped runtime files.
+const sinkPattern = /\.innerHTML\b|\.outerHTML\b|insertAdjacentHTML\s*\(|document\.write(?:ln)?\s*\(|\beval\s*\(|new Function\s*\(|javascript:|postMessage\s*\(|localStorage|sessionStorage|\blocation\.(?:href|assign|replace)\s*=|\son(?:click|load|error|mouseover)\s*=/i;
+const sinkHits = [];
+for (const f of files.filter((name) => name.endsWith(".js"))) {
+  if (sinkPattern.test(read(f))) sinkHits.push(f);
+}
+if (/<script\b[^>]+src="https?:\/\//i.test(html)) sinkHits.push("index.html:remote script");
+if (/\son(?:click|load|error|mouseover)\s*=/i.test(html)) sinkHits.push("index.html:inline handler");
+check("no dangerous DOM sinks", sinkHits.length === 0, sinkHits.join(", "));
 
 // External security hygiene: new tabs must not expose window.opener, and no insecure URLs.
 const blankLinks = [...html.matchAll(/<a\b[^>]*\btarget="_blank"[^>]*>/gi)].map((m) => m[0]);
@@ -141,14 +154,24 @@ check("new-tab links use rel=noopener", unsafeBlank.length === 0, `${unsafeBlank
 const insecure = [...html.matchAll(/(?:href|src)="(http:\/\/[^"]*)"/gi)].map((m) => m[1]);
 check("no insecure URLs", insecure.length === 0, insecure.join(", "));
 
-// JavaScript syntax.
-const jsFiles = files.filter((f) => f.endsWith(".js") || f.endsWith(".mjs"));
+// JavaScript syntax, including the test harness.
+const testDir = join(root, "tests");
+const testFiles = existsSync(testDir) ? readdirSync(testDir).filter((f) => f.endsWith(".mjs")) : [];
+const jsFiles = [...files.filter((f) => f.endsWith(".js") || f.endsWith(".mjs")), ...testFiles.map((f) => join("tests", f))];
 const badJs = [];
 for (const f of jsFiles) {
   const r = spawnSync(process.execPath, ["--check", join(root, f)], { encoding: "utf8" });
   if (r.status !== 0) badJs.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
 }
 check("JavaScript syntax", badJs.length === 0, badJs.join("; "));
+
+// Behaviour of the core journeys, exercised in Node with small DOM stand-ins.
+const behaviourTests = testFiles.filter((f) => f.endsWith(".test.mjs"));
+if (behaviourTests.length) {
+  const r = spawnSync(process.execPath, ["--test", ...behaviourTests.map((f) => join(root, "tests", f))], { encoding: "utf8" });
+  const detail = r.status === 0 ? "" : ((r.stderr || r.stdout || "").split("\n").filter((l) => /✖|not ok|Error/.test(l)).slice(0, 2).join(" | "));
+  check("behaviour tests pass", r.status === 0, detail);
+}
 
 if (failures.length) {
   console.error(`FAILED ${failures.length} of ${checks} checks:`);
