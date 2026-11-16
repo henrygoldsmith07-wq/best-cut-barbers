@@ -18,6 +18,20 @@ function check(name, ok, detail = "") {
 const read = (f) => readFileSync(join(root, f), "utf8");
 const files = readdirSync(root);
 
+// GitHub Pages serves on a case-sensitive filesystem. A path that resolves on
+// Windows but differs in case would 404 once published, so compare each segment.
+function existsExact(rel) {
+  let dir = root;
+  for (const seg of rel.replace(/\\/g, "/").split("/")) {
+    if (!seg || seg === ".") continue;
+    let names;
+    try { names = readdirSync(dir); } catch { return false; }
+    if (!names.includes(seg)) return false;
+    dir = join(dir, seg);
+  }
+  return true;
+}
+
 const html = read("index.html");
 
 // One h1, unique IDs.
@@ -52,6 +66,15 @@ for (const attr of ["aria-labelledby", "aria-controls", "aria-describedby", "ari
 }
 check("ARIA ID references resolve", badAria.length === 0, badAria.join(", "));
 
+// Static label targets must point at an element on the page.
+const brokenLabels = [];
+for (const m of html.matchAll(/\bfor="([^"]+)"/gi)) {
+  for (const token of m[1].split(/\s+/)) {
+    if (token && !ids.includes(token)) brokenLabels.push(`for="${token}"`);
+  }
+}
+check("label targets resolve", brokenLabels.length === 0, brokenLabels.join(", "));
+
 // Every visible form control needs a label or an accessible name.
 const labelled = new Set([...html.matchAll(/<label\s+for="([^"]+)"/g)].map((m) => m[1]));
 const unlabelled = [];
@@ -71,6 +94,8 @@ const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
   .filter((u) => !/^(?:https?:|#|tel:|mailto:|data:)/i.test(u));
 const missingRefs = [...new Set(refs.filter((u) => !existsSync(join(root, u))))];
 check("local HTML references exist", missingRefs.length === 0, missingRefs.join(", "));
+const caseMismatch = [...new Set(refs.filter((u) => existsSync(join(root, u)) && !existsExact(u)))];
+check("asset paths match exact case", caseMismatch.length === 0, caseMismatch.join(", "));
 
 // Stylesheets referenced by the page.
 const sheetRefs = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map((m) => m[1]);
@@ -136,6 +161,7 @@ check("strict script policy", /script-src 'self'/.test(html) && /form-action 'no
 const cspAt = html.search(/<meta\s+http-equiv="Content-Security-Policy"/i);
 const firstScriptAt = html.search(/<script\b/i);
 check("CSP meta precedes scripts", cspAt !== -1 && firstScriptAt !== -1 && cspAt < firstScriptAt);
+check("hardened CSP", /default-src 'self'/.test(html) && /base-uri 'none'/.test(html) && /object-src 'none'/.test(html));
 
 // No DOM XSS or code-execution sinks in the shipped runtime files.
 const sinkPattern = /\.innerHTML\b|\.outerHTML\b|insertAdjacentHTML\s*\(|document\.write(?:ln)?\s*\(|\beval\s*\(|new Function\s*\(|javascript:|postMessage\s*\(|localStorage|sessionStorage|\blocation\.(?:href|assign|replace)\s*=|\son(?:click|load|error|mouseover)\s*=/i;
@@ -147,10 +173,10 @@ if (/<script\b[^>]+src="https?:\/\//i.test(html)) sinkHits.push("index.html:remo
 if (/\son(?:click|load|error|mouseover)\s*=/i.test(html)) sinkHits.push("index.html:inline handler");
 check("no dangerous DOM sinks", sinkHits.length === 0, sinkHits.join(", "));
 
-// External security hygiene: new tabs must not expose window.opener, and no insecure URLs.
+// External security hygiene: new tabs must not expose window.opener or a referrer, and no insecure URLs.
 const blankLinks = [...html.matchAll(/<a\b[^>]*\btarget="_blank"[^>]*>/gi)].map((m) => m[0]);
-const unsafeBlank = blankLinks.filter((tag) => !/\brel="[^"]*\bnoopener\b[^"]*"/i.test(tag));
-check("new-tab links use rel=noopener", unsafeBlank.length === 0, `${unsafeBlank.length} of ${blankLinks.length}`);
+const unsafeBlank = blankLinks.filter((tag) => !/\bnoopener\b/i.test(tag) || !/\bnoreferrer\b/i.test(tag));
+check("new-tab links use rel=noopener noreferrer", unsafeBlank.length === 0, `${unsafeBlank.length} of ${blankLinks.length}`);
 const insecure = [...html.matchAll(/(?:href|src)="(http:\/\/[^"]*)"/gi)].map((m) => m[1]);
 check("no insecure URLs", insecure.length === 0, insecure.join(", "));
 
