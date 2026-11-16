@@ -26,3 +26,6 @@ Brand-specific vibrancy layer appended to site.css: richer gradients and section
 
 ## Verification — 16 November 2026
 Run `node verify.mjs` from the repository root to repeat the static checks without installing anything or starting a server. It checks the single h1, unique IDs, local asset references, CSS asset references and brace balance, that used HTML classes are styled, that JSON-LD parses, the strict script policy, and JavaScript syntax. A zero exit status means all checks passed. This complements, but does not replace, the manual browser checks recorded in QA-2026-11-16.md.
+
+## Accessibility and verifier hardening — 16 November 2026
+The skip link's target (`#main`) now has `tabindex="-1"`, so activating "Skip to content" reliably moves keyboard focus into the main landmark. The verifier gained four checks: in-page `href="#id"` links resolve to a real element, the skip-link target is focusable, `target="_blank"` links carry `rel="noopener"`, and no `http://` URLs are present. Each was confirmed to fail on a planted defect. Static checks now total 15; no business details, dependencies or publish settings changed.
