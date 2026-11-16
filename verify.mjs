@@ -113,6 +113,14 @@ blocks.forEach((b, i) => {
 });
 check("JSON-LD parses", badJson.length === 0, badJson.join("; "));
 
+// Web app manifest parses and its local icons exist.
+let manifest = null;
+try { manifest = JSON.parse(read("site.webmanifest")); } catch { /* reported below */ }
+check("webmanifest parses", !!manifest);
+const mfIcons = (manifest?.icons || []).map((i) => i.src).filter((u) => u && !/^(?:https?:|data:)/i.test(u));
+const mfMissing = mfIcons.filter((u) => !existsSync(join(root, u)));
+check("webmanifest icons exist", mfMissing.length === 0, mfMissing.join(", "));
+
 // Click-to-call numbers must agree with the telephone in structured data.
 const digits = (s) => (s.match(/\d/g) || []).join("");
 const ldPhones = new Set(blocks.flatMap((b) => {
