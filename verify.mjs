@@ -27,6 +27,20 @@ const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
 const dupes = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
 check("unique IDs", dupes.length === 0, dupes.join(", "));
 
+// In-page fragment links point at an existing element. A bare "#" is the top of the page.
+const fragments = [...html.matchAll(/href="#([^"]*)"/g)]
+  .map((m) => m[1])
+  .filter(Boolean);
+const brokenFragments = [...new Set(fragments.filter((f) => !ids.includes(f)))];
+check("in-page anchors resolve", brokenFragments.length === 0, brokenFragments.join(", "));
+
+// The skip link's target must be able to receive focus.
+const skipTarget = html.match(/class="skip"[^>]*href="#([^"]+)"/)?.[1];
+const skipFocusable = skipTarget
+  ? new RegExp(`<[^>]*\\sid="${skipTarget}"[^>]*\\stabindex="-1"|<[^>]*\\stabindex="-1"[^>]*\\sid="${skipTarget}"`).test(html)
+  : false;
+check("skip link target is focusable", skipFocusable, skipTarget || "no skip link found");
+
 // Local src/href references resolve.
 const refs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
   .map((m) => m[1])
@@ -77,6 +91,13 @@ check("JSON-LD parses", badJson.length === 0, badJson.join("; "));
 
 // Strict script policy.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
+
+// External security hygiene: new tabs must not expose window.opener, and no insecure URLs.
+const blankLinks = [...html.matchAll(/<a\b[^>]*\btarget="_blank"[^>]*>/gi)].map((m) => m[0]);
+const unsafeBlank = blankLinks.filter((tag) => !/\brel="[^"]*\bnoopener\b[^"]*"/i.test(tag));
+check("new-tab links use rel=noopener", unsafeBlank.length === 0, `${unsafeBlank.length} of ${blankLinks.length}`);
+const insecure = [...html.matchAll(/(?:href|src)="(http:\/\/[^"]*)"/gi)].map((m) => m[1]);
+check("no insecure URLs", insecure.length === 0, insecure.join(", "));
 
 // JavaScript syntax.
 const jsFiles = files.filter((f) => f.endsWith(".js") || f.endsWith(".mjs"));
