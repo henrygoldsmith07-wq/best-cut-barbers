@@ -30,25 +30,3 @@ html.js-reveal [data-reveal].is-in{opacity:1;transform:none}
 .basket-count.pop{animation:pop .3s cubic-bezier(.22,1,.36,1)}@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.28)}100%{transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){html.js-reveal [data-reveal]{transition:none;opacity:1;transform:none}.basket-count.pop{animation:none}.hero-parallax{transition:none}}
 
-/* ---- Vibrancy pass: electric cobalt, lime, neon depth (reduced-motion safe) ---- */
-:root{--cobalt:#2458d6;--cobalt-deep:#1b43a8;--lime:#c8e34b;--lime-deep:#a9c92f;--papaya:#ffb347}
-.top{background:linear-gradient(160deg,#0f1f18,#182a22 55%,#20372c)!important}
-.direction-hero{background:
-  radial-gradient(80% 70% at 90% 0%, rgba(36,88,214,.35) 0%, rgba(36,88,214,0) 55%),
-  radial-gradient(60% 60% at 0% 100%, rgba(200,227,75,.28) 0%, rgba(200,227,75,0) 55%),
-  linear-gradient(160deg,#0f1f18,#182a22 55%,#20372c)}
-.direction-copy h1{background:linear-gradient(100deg,#ffe9b3,#fff 45%,#c8e34b);-webkit-background-clip:text;background-clip:text;color:transparent}
-.direction-hero .btn-primary{background:linear-gradient(135deg,#e7cf87,#d9c17e);color:#12231b;box-shadow:0 12px 28px -12px rgba(217,193,126,.55)}
-.direction-hero .btn-primary:hover{background:linear-gradient(135deg,#f2df9c,#caaf6a)}
-.direction-hero .btn-ghost{border-color:#8aa08f;color:#eef2e9}
-.direction-hero .btn-ghost:hover{background:rgba(255,255,255,.06)}
-.direction-visual{position:relative}
-.direction-visual::after{content:"";position:absolute;inset:8px;border:2px solid rgba(200,227,75,.35);border-radius:16px;pointer-events:none}
-.service-choice button[aria-pressed=true]{background:linear-gradient(135deg,#2458d6,#1b43a8);color:#fff;border-color:#1b43a8;box-shadow:0 10px 24px -10px rgba(36,88,214,.6)}
-.service-choice button{border:2px solid #5d7268;color:#eef2e9;background:rgba(255,255,255,.04)}
-.service-choice button:hover:not([aria-pressed=true]){border-color:#c8e34b}
-.planning{background:linear-gradient(180deg,#f0f3e8,#e7ede6)}
-.planning .button{background:linear-gradient(135deg,#2458d6,#1b43a8)}
-.planning .button:hover{background:linear-gradient(135deg,#2e64e5,#163a92)}
-.services li{border-top:4px solid;border-image:linear-gradient(90deg,#2458d6,#c8e34b) 1}
-.section-head h2{background:linear-gradient(100deg,#1b43a8,#2458d6 55%,#a9c92f);-webkit-background-clip:text;background-clip:text;color:transparent}
