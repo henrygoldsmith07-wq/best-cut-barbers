@@ -3,13 +3,13 @@
 Independent zero-dependency static site for Henry Goldsmith. Open index.html via any static server. No build or paid services required.
 
 ## Functional scope
-Forms prepare a visible request or call note. Email links open the visitor's email app; no message is automatically sent. A reference is local, not a server booking. No payments, confirmed bookings, delivery promises or invented prices.
+The form prepares a visit note with the chosen service, preferred day, optional time and questions. The note is displayed for the visitor to copy or read out when calling; nothing is sent automatically and no booking is made. Contact links open the phone dialler. There are no prices, payments, checkout, confirmed bookings or delivery promises.
 
 ## Before owner launch
-Confirm contact details, hours, service/menu content and accessibility needs with the owner. Replace the candidate GitHub Pages canonical/social URLs with the actual deployment URL. Search indexing is blocked by robots.txt pending owner launch approval. Remove that block and submit sitemap.xml only at approved launch. No real merchant checkout is configured.
+Confirm contact details, hours, service content and accessibility needs with the owner. Replace the candidate GitHub Pages canonical/social URLs with the actual deployment URL. Search indexing is blocked by robots.txt pending owner launch approval. Remove that block and submit sitemap.xml only at approved launch.
 
 ## Security and privacy
-No third-party scripts, fonts, trackers or card handling. Executable JavaScript is self-hosted and CSP permits only self scripts. Form input is escaped or inserted as text. Gift shortlists use localStorage; visit details stay in the current tab.
+No third-party scripts, fonts, trackers, analytics or card handling. Executable JavaScript is self-hosted and the CSP permits only self scripts. Form input is inserted as text, never as HTML. The visit note stays in the current tab: nothing is stored on the device or sent to a server.
 
 Prepared 15 November 2026.
 
