@@ -167,7 +167,7 @@ blocks.forEach((b, i) => {
 check("JSON-LD parses", badJson.length === 0, badJson.join("; "));
 
 // One addressed business entity, with any referenced nodes actually present.
-// A second HairSalon node for the offer catalogue is intentional.
+// The offer catalogue is inline on the salon; the contact point is a separate node.
 const ldNodes = blocks.flatMap((b) => {
   try { const j = JSON.parse(b); return Array.isArray(j) ? j : [j]; } catch { return []; }
 });
@@ -183,6 +183,10 @@ for (const j of salonNodes) {
   }
 }
 check("structured data references resolve", danglingRefs.length === 0, danglingRefs.join(", "));
+// A contactPoint reference must resolve to an actual ContactPoint, not back to the salon.
+const contactPointIds = new Set(ldNodes.filter((j) => j["@type"] === "ContactPoint").map((j) => j["@id"]).filter(Boolean));
+const badContactRefs = salonNodes.map((j) => j.contactPoint?.["@id"]).filter((id) => id && !contactPointIds.has(id));
+check("contactPoint references a ContactPoint node", contactPointIds.size > 0 && badContactRefs.length === 0, badContactRefs.join(", ") || "no ContactPoint node");
 
 // Documented metadata must stay present in the shipped page.
 check("main page language set", /<html lang="en-GB"/.test(html));
@@ -327,6 +331,11 @@ const cspAt = html.search(/<meta\s+http-equiv="Content-Security-Policy"/i);
 const firstScriptAt = html.search(/<script\b/i);
 check("CSP meta precedes scripts", cspAt !== -1 && firstScriptAt !== -1 && cspAt < firstScriptAt);
 check("hardened CSP", /default-src 'self'/.test(html) && /base-uri 'none'/.test(html) && /object-src 'none'/.test(html));
+// No data-URI images or network connections are used, so neither channel needs allowing.
+const tightImages = /img-src 'self'(?!\s+data:)/;
+const noNetwork = /connect-src 'none'/;
+check("resource policy closes unused data and network channels",
+  tightImages.test(html) && noNetwork.test(html) && tightImages.test(notFound) && noNetwork.test(notFound));
 
 // No DOM XSS or code-execution sinks in the shipped runtime files.
 const sinkPattern = /\.innerHTML\b|\.outerHTML\b|insertAdjacentHTML\s*\(|document\.write(?:ln)?\s*\(|\beval\s*\(|new Function\s*\(|javascript:|postMessage\s*\(|localStorage|sessionStorage|\blocation\.(?:href|assign|replace)\s*=|\son(?:click|load|error|mouseover)\s*=/i;
