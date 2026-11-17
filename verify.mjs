@@ -208,6 +208,8 @@ const ldPhones = new Set(blocks.flatMap((b) => {
 const telLinks = [...new Set([...html.matchAll(/href="tel:([^"]+)"/g)].map((m) => m[1]))];
 const phoneMismatch = telLinks.filter((t) => ldPhones.size && !ldPhones.has(digits(t)));
 check("tel links match structured data", ldPhones.size > 0 && phoneMismatch.length === 0, phoneMismatch.join(", "));
+// Multiple JSON-LD nodes carry the telephone; they must agree on one number.
+check("structured telephone is singular", ldPhones.size === 1, [...ldPhones].join(", "));
 
 // The number is also printed as text and embedded in generated links, not only in tel: hrefs.
 const phonePattern = /(?:\+?44|0)7\d{3}[\s -]?\d{6}/g;
@@ -314,6 +316,10 @@ check("404 has strict script policy and noindex", /script-src 'self'/.test(notFo
 const canonical = html.match(/rel="canonical" href="([^"]+)"/)?.[1];
 const sitemapLocs = [...read("sitemap.xml").matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 check("sitemap matches canonical URL", !!canonical && sitemapLocs.length > 0 && sitemapLocs.every((u) => u === canonical), sitemapLocs.join(", "));
+
+// Until owner launch, indexing is deliberately blocked in both places.
+check("main page blocks indexing", /name="robots" content="[^"]*noindex/i.test(html));
+check("robots.txt disallows crawling", /Disallow:\s*\/\s*$/m.test(read("robots.txt")));
 
 // Strict script policy, and the meta CSP must appear before anything it governs.
 check("strict script policy", /script-src 'self'/.test(html) && /form-action 'none'/.test(html));
