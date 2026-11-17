@@ -77,3 +77,6 @@ Applied `security-best-practices`, `frontend-design`, `canvas-design` and `Hallm
 
 ## Verifier speed and social-image guard — 17 November 2026
 `verify.mjs` now starts its per-file `node --check` processes concurrently rather than one at a time. On this Windows host a full run fell from about 90 seconds to about 30 seconds with the same checks and results. It also checks that `og-image.png` exists and reports 1200×630, since social previews reference it by absolute URL and the local-asset check did not cover it. Both changes were negative-tested: a planted syntax error failed the syntax check, and a missing image failed the new check; both files were restored.
+
+## Continuous verification — 17 November 2026
+Added `.github/workflows/ci.yml` so the repo's own `node verify.mjs` runs automatically on pushes to `main` and on pull requests, across Node 20 and 24. There are no dependencies to install; the verifier already includes the behaviour suites. This closes the gap where 60 static checks and 35 behaviour tests existed but only ran when someone invoked them by hand.
