@@ -380,6 +380,9 @@ check("JavaScript syntax", badJs.length === 0, badJs.join("; "));
 
 // Behaviour of the core journeys, exercised in Node with small DOM stand-ins.
 const behaviourTests = testFiles.filter((f) => f.endsWith(".test.mjs"));
+// Without this guard, deleting the suites would silently drop the check instead
+// of failing, so CI could go green with no behaviour coverage at all.
+check("all behaviour suites are present", behaviourTests.length >= 6, `${behaviourTests.length} of 6 suites found`);
 if (behaviourTests.length) {
   const r = spawnSync(process.execPath, ["--test", ...behaviourTests.map((f) => join(root, "tests", f))], { encoding: "utf8" });
   const detail = r.status === 0 ? "" : ((r.stderr || r.stdout || "").split("\n").filter((l) => /✖|not ok|Error/.test(l)).slice(0, 2).join(" | "));

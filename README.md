@@ -80,3 +80,6 @@ Applied `security-best-practices`, `frontend-design`, `canvas-design` and `Hallm
 
 ## Continuous verification — 17 November 2026
 Added `.github/workflows/ci.yml` so the repo's own `node verify.mjs` runs automatically on pushes to `main` and on pull requests, across Node 20 and 24. There are no dependencies to install; the verifier already includes the behaviour suites. This closes the gap where 60 static checks and 35 behaviour tests existed but only ran when someone invoked them by hand.
+
+## Behaviour-suite presence guard — 17 November 2026
+`verify.mjs` now requires all six behaviour suites to be present before running them. Previously an empty `tests/` directory made the verifier skip the behaviour check entirely and report success with one fewer check; a planted removal now fails with "5 of 6 suites found".
