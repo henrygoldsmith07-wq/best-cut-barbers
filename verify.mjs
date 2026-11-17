@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const failures = [];
@@ -203,6 +203,15 @@ const mfIcons = (manifest?.icons || []).map((i) => i.src).filter((u) => u && !/^
 const mfMissing = mfIcons.filter((u) => !existsSync(join(root, u)));
 check("webmanifest icons exist", mfMissing.length === 0, mfMissing.join(", "));
 
+// The social preview is referenced by absolute URL, so a cheap local header check
+// is the only way to catch a missing or wrongly sized og-image.png.
+let ogSize = "missing";
+if (existsSync(join(root, "og-image.png"))) {
+  const png = readFileSync(join(root, "og-image.png"));
+  if (png.subarray(1, 4).toString() === "PNG") ogSize = `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
+}
+check("social image is a 1200x630 PNG", ogSize === "1200x630", ogSize);
+
 // Click-to-call numbers must agree with the telephone in structured data.
 const digits = (s) => (s.match(/\d/g) || []).join("");
 const ldPhones = new Set(blocks.flatMap((b) => {
@@ -358,11 +367,15 @@ check("no insecure URLs", insecure.length === 0, insecure.join(", "));
 const testDir = join(root, "tests");
 const testFiles = existsSync(testDir) ? readdirSync(testDir).filter((f) => f.endsWith(".mjs")) : [];
 const jsFiles = [...files.filter((f) => f.endsWith(".js") || f.endsWith(".mjs")), ...testFiles.map((f) => join("tests", f))];
-const badJs = [];
-for (const f of jsFiles) {
-  const r = spawnSync(process.execPath, ["--check", join(root, f)], { encoding: "utf8" });
-  if (r.status !== 0) badJs.push(`${f}: ${(r.stderr || "").trim().split("\n")[0]}`);
-}
+// Spawn the checks concurrently: on Windows each process start dominates the
+// runtime, and running them serially made a full verify take about 90 seconds.
+const syntaxResults = await Promise.all(jsFiles.map((f) => new Promise((resolve) => {
+  const child = spawn(process.execPath, ["--check", join(root, f)], { stdio: ["ignore", "ignore", "pipe"] });
+  let err = "";
+  child.stderr.on("data", (chunk) => { err += chunk; });
+  child.on("close", (code) => resolve(code === 0 ? null : `${f}: ${err.trim().split("\n")[0]}`));
+})));
+const badJs = syntaxResults.filter(Boolean);
 check("JavaScript syntax", badJs.length === 0, badJs.join("; "));
 
 // Behaviour of the core journeys, exercised in Node with small DOM stand-ins.
