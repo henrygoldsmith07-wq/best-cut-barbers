@@ -83,3 +83,6 @@ Added `.github/workflows/ci.yml` so the repo's own `node verify.mjs` runs automa
 
 ## Behaviour-suite presence guard — 17 November 2026
 `verify.mjs` now requires all six behaviour suites to be present before running them. Previously an empty `tests/` directory made the verifier skip the behaviour check entirely and report success with one fewer check; a planted removal now fails with "5 of 6 suites found".
+
+## Metadata URL guard — 18 November 2026
+`verify.mjs` now checks that `og:url`, the JSON-LD `url` and `image`, and the sitemap all agree with the page's canonical URL. A planted change to `og:url` failed the check; the page was restored. This keeps the pending launch-domain switch from being applied to only some metadata.

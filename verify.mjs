@@ -329,6 +329,16 @@ check("404 has strict script policy and noindex", /script-src 'self'/.test(notFo
 const canonical = html.match(/rel="canonical" href="([^"]+)"/)?.[1];
 const sitemapLocs = [...read("sitemap.xml").matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 check("sitemap matches canonical URL", !!canonical && sitemapLocs.length > 0 && sitemapLocs.every((u) => u === canonical), sitemapLocs.join(", "));
+// Social and structured-data URLs can drift from the canonical independently;
+// keep them together so a future launch-domain change cannot half-apply.
+const ogUrl = html.match(/property="og:url" content="([^"]+)"/)?.[1];
+const metaDrift = [];
+if (ogUrl && ogUrl !== canonical) metaDrift.push(`og:url ${ogUrl}`);
+if (salon?.url && salon.url !== canonical) metaDrift.push(`JSON-LD url ${salon.url}`);
+if (salon?.image && salon.image !== `${canonical}og-image.png`) metaDrift.push(`JSON-LD image ${salon.image}`);
+check("social and structured URLs agree with canonical",
+  !!canonical && !!ogUrl && !!salon?.url && !!salon?.image && metaDrift.length === 0,
+  metaDrift.join(", ") || "missing metadata");
 
 // Until owner launch, indexing is deliberately blocked in both places.
 check("main page blocks indexing", /name="robots" content="[^"]*noindex/i.test(html));
